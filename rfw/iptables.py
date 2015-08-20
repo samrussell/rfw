@@ -29,7 +29,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import inspect, re, subprocess, logging, json, copy
+import inspect, re, subprocess, logging, json, copy, iptc
 from collections import namedtuple
 from threading import RLock
 
@@ -249,6 +249,12 @@ class Iptables:
         lcmd = Iptables.rule_to_command(rule)
         return Iptables.exe(['-' + modify] + lcmd)
 
+    @staticmethod
+    def exe_rule_iptc(modify, rule):
+        assert modify == 'I' or modify == 'D'
+        # call python-iptables
+        raise NotImplementedError()
+
 
     @staticmethod
     def exe(lcmd):
@@ -279,6 +285,73 @@ class Iptables:
         if chain == 'FORWARD' or chain is None:
             forward_rules = ipt.find({'target': Rule.RULE_TARGETS, 'chain': ['FORWARD'], 'prot': ['all']})
             rules.extend(forward_rules)
+        return rules
+
+    @staticmethod
+    def convert_ip_and_mask_to_ip_and_cidr(ip_and_mask):
+        ip, mask = ip_and_mask.split('/')
+        # turn '255.255.255.0' mask into '/24'
+        mask_octets = mask.split('.')
+        # we will do weird stuff with junk data
+        # 255.255.0.255 will go to /24 with this method, for example
+        cidr = 0
+        for octet_str in mask_octets:
+            octet = int(octet_str)
+            while octet > 0:
+                cidr = cidr + (octet & 1)
+                octet = octet >> 1
+        # ignore cidr if it is /32
+        if cidr == 32:
+            return '%s' % (ip, )
+        return '%s/%d' % (ip, cidr)
+
+    # TODO: parse this somewhere better?
+    @staticmethod
+    def parse_rule_iptc(chain_name, index, rule):
+        """
+        Inputs:
+        chain_name: name of the chain (string)
+        index: index number of the rule
+        rule: iptc.Rule object from iptc
+        Returns:
+        an Iptables.Rule object
+        """
+        # parse these out
+        # Rule._fields =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
+        rule_attributes = {}
+        rule_attributes['chain'] = chain_name
+        # index is 0-based from list, num is 1-based
+        rule_attributes['num'] = '%d' % (index + 1)
+        # zero counters for now
+        #return hash((self.chain, self.target, self.prot, self.opt, self.inp, self.out, self.source, self.destination, ))
+        rule_attributes['pkts'] = 0
+        rule_attributes['bytes'] = 0
+        rule_attributes['target'] = rule.target.name
+        protocol = rule.protocol
+        if protocol == 'ip':
+            protocol = 'all'
+        rule_attributes['prot'] = protocol
+        # set this blank - is not correct, but we will get better access later
+        rule_attributes['opt'] = '--'
+        rule_attributes['inp'] = rule.in_interface if rule.in_interface else '*'
+        rule_attributes['out'] = rule.out_interface if rule.out_interface else '*'
+        rule_attributes['source'] = Iptables.convert_ip_and_mask_to_ip_and_cidr(rule.src)
+        rule_attributes['destination'] = Iptables.convert_ip_and_mask_to_ip_and_cidr(rule.dst)
+        return Rule(rule_attributes)
+
+    @staticmethod
+    def read_simple_rules_iptc(chain=None):
+        assert chain is None or chain in Rule.RULE_CHAINS
+        rules = []
+        filter_table = iptc.Table(iptc.Table.FILTER)
+        filter_table.refresh()
+        iptables_chains_by_name = {chain.name : chain for chain in filter_table.chains}
+        chains_to_search = [chain] if chain is not None else Rule.RULE_CHAINS
+        for chain_name in chains_to_search:
+            # horrible variable name, but 'chain' is the arg (should change this instead)
+            chain_chain = iptables_chains_by_name[chain_name]
+            for index, rule in enumerate(chain_chain.rules):
+                rules.append(Iptables.parse_rule_iptc(chain_name, index, rule))
         return rules
 
     # find is a non-static method as it should be called after instantiation with Iptables.load()

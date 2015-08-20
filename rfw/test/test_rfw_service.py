@@ -133,4 +133,22 @@ class IptablesTest(TestCase):
             rules_after_deletion = iptables.Iptables.read_simple_rules()
             self.assertEquals(set(rules_before_modification), set(rules_after_deletion))
 
+    def test_iptc_read(self):
+        """Check that the iptc version of read_simple_rules() behaves as expected
+        """
+        # this passes if the rules match the in the read_simple_rules() func
+        # read_simple_rules_iptc reads all rules, not just these ones
+        #if chain == 'INPUT' or chain is None:
+        #    input_rules = ipt.find({'target': Rule.RULE_TARGETS, 'chain': ['INPUT'], 'destination': ['0.0.0.0/0'], 'out': ['*'], 'prot': ['all']})
+        #    rules.extend(input_rules)
+        #if chain == 'OUTPUT' or chain is None:
+        #    output_rules = ipt.find({'target': Rule.RULE_TARGETS, 'chain': ['OUTPUT'], 'source': ['0.0.0.0/0'], 'inp': ['*'], 'prot': ['all']})
+        #    rules.extend(output_rules)
+        #if chain == 'FORWARD' or chain is None:
+        #    forward_rules = ipt.find({'target': Rule.RULE_TARGETS, 'chain': ['FORWARD'], 'prot': ['all']})
+        #    rules.extend(forward_rules)
+        rules_old = iptables.Iptables.read_simple_rules()
+        rules_iptc = iptables.Iptables.read_simple_rules_iptc()
+        self.assertEquals(set(rules_old), set(rules_iptc))
+
 
