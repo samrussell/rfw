@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+# Copyright (c) 2015 Sam Russell <sam.h.russell@gmail.com>
 # Copyrite (c) 2014 SecurityKISS Ltd (http://www.securitykiss.com)  
 #
 # This file is part of rfw
@@ -79,7 +80,7 @@ def parse_command_path(path):
 
     action = p[0]
    
-    if action.upper() in iptables.RULE_TARGETS:
+    if action.upper() in iptables.Rule.RULE_TARGETS:
         try:
             return action, build_rule(p)
         except ValueError, e:
@@ -90,7 +91,7 @@ def parse_command_path(path):
             return action, None
         elif len(p) == 2:
             chain = p[1].upper()
-            if chain in iptables.RULE_CHAINS:
+            if chain in iptables.Rule.RULE_CHAINS:
                 return action, chain
             else:
                 raise PathError(path, 'Wrong chain name for list command')
@@ -106,11 +107,11 @@ def build_rule(p):
     if len(p) < 4:
         raise ValueError('Not enough details to construct the rule')
     target = p[0].upper()
-    if target not in iptables.RULE_TARGETS:
-        raise ValueError('The action should be one of {}'.format(iptables.RULE_TARGETS))
+    if target not in iptables.Rule.RULE_TARGETS:
+        raise ValueError('The action should be one of {}'.format(iptables.Rule.RULE_TARGETS))
     chain = p[1].upper()
-    if chain not in iptables.RULE_CHAINS:
-        raise ValueError('The chain should be one of {}'.format(iptables.RULE_CHAINS))
+    if chain not in iptables.Rule.RULE_CHAINS:
+        raise ValueError('The chain should be one of {}'.format(iptables.Rule.RULE_CHAINS))
     iface1 = p[2]
     if len(iface1) > 16:
         raise ValueError('Interface name too long. Max 16 characters')

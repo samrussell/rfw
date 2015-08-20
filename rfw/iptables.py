@@ -39,31 +39,43 @@ from threading import RLock
 log = logging.getLogger('lib.{}'.format(__name__))
 log.addHandler(logging.NullHandler())
 
-# note that the 'in' attribute from iptables output was renamed to 'inp' to avoid python keyword clash
-IPTABLES_HEADERS =         ['num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'in', 'out', 'source', 'destination'] 
-RULE_ATTRS =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
-RULE_TARGETS =      ['DROP', 'ACCEPT', 'REJECT']
-RULE_CHAINS =       ['INPUT', 'OUTPUT', 'FORWARD']
-RULE_DEFAULTS =     {
-                        'chain': None,
-                        'num': None,
-                        'pkts': None,
-                        'bytes': None,
-                        'target': None,
-                        'prot': 'all',
-                        'opt': '--',
-                        'inp': '*',
-                        'out': '*',
-                        'source': '0.0.0.0/0',
-                        'destination': '0.0.0.0/0'
-                    }
 
-
-RuleProto = namedtuple('Rule', RULE_ATTRS)
+RuleProto = namedtuple('Rule', [
+                            'chain',
+                            'num',
+                            'pkts',
+                            'bytes',
+                            'target',
+                            'prot',
+                            'opt',
+                            'inp',
+                            'out',
+                            'source',
+                            'destination'
+                        ]
+                        )
 
 class Rule(RuleProto):
     """Lightweight immutable value object to store iptables rule
     """
+    # note that the 'in' attribute from iptables output was renamed to 'inp' to avoid python keyword clash
+    #Rule._fields =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
+    RULE_TARGETS =      ['DROP', 'ACCEPT', 'REJECT']
+    RULE_CHAINS =       ['INPUT', 'OUTPUT', 'FORWARD']
+    RULE_DEFAULTS =     {
+                            'chain': None,
+                            'num': None,
+                            'pkts': None,
+                            'bytes': None,
+                            'target': None,
+                            'prot': 'all',
+                            'opt': '--',
+                            'inp': '*',
+                            'out': '*',
+                            'source': '0.0.0.0/0',
+                            'destination': '0.0.0.0/0'
+                        }
+
     def __new__(_cls, *args, **kwargs):
         """Construct Rule tuple from a list or a dictionary
         """
@@ -75,9 +87,9 @@ class Rule(RuleProto):
                 return RuleProto.__new__(_cls, *props)
             elif isinstance(props, dict):
                 for prop in props:
-                    if prop not in RULE_ATTRS:
+                    if prop not in Rule._fields:
                         raise ValueError('Property %s is not a valid argument to pass to Rule()', prop)
-                default_settings = copy.deepcopy(RULE_DEFAULTS)
+                default_settings = copy.deepcopy(Rule.RULE_DEFAULTS)
                 default_settings.update(props)
                 return RuleProto.__new__(_cls, **default_settings)
             else:
@@ -107,7 +119,7 @@ class Rule(RuleProto):
 
 class Iptables:
 
-
+    IPTABLES_HEADERS =         ['num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'in', 'out', 'source', 'destination'] 
     # global lock for system iptables access
     lock = RLock()
     # store ipt_path as class variable, it's a system wide singleton anyway
@@ -168,12 +180,12 @@ class Iptables:
                 chain = None  #on blank line reset current chain
                 continue
             m = re.match(r"Chain (\w+) .*", line)
-            if m and m.group(1) in RULE_CHAINS:
+            if m and m.group(1) in Rule.RULE_CHAINS:
                 chain = m.group(1)
                 continue
             if "source" in line and "destination" in line:
                 # check if iptables output headers make sense 
-                assert line.split()  == IPTABLES_HEADERS
+                assert line.split()  == Iptables.IPTABLES_HEADERS
                 continue
             if chain:
                 columns = line.split()
@@ -254,18 +266,18 @@ class Iptables:
 
     @staticmethod
     def read_simple_rules(chain=None):
-        assert chain is None or chain in RULE_CHAINS
+        assert chain is None or chain in Rule.RULE_CHAINS
         rules = []
         ipt = Iptables.load()
         # rfw originated rules may have only DROP/ACCEPT/REJECT targets and do not specify protocol and do not have extra args like ports
         if chain == 'INPUT' or chain is None:
-            input_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['INPUT'], 'destination': ['0.0.0.0/0'], 'out': ['*'], 'prot': ['all']})
+            input_rules = ipt.find({'target': Rule.RULE_TARGETS, 'chain': ['INPUT'], 'destination': ['0.0.0.0/0'], 'out': ['*'], 'prot': ['all']})
             rules.extend(input_rules)
         if chain == 'OUTPUT' or chain is None:
-            output_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['OUTPUT'], 'source': ['0.0.0.0/0'], 'inp': ['*'], 'prot': ['all']})
+            output_rules = ipt.find({'target': Rule.RULE_TARGETS, 'chain': ['OUTPUT'], 'source': ['0.0.0.0/0'], 'inp': ['*'], 'prot': ['all']})
             rules.extend(output_rules)
         if chain == 'FORWARD' or chain is None:
-            forward_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['FORWARD'], 'prot': ['all']})
+            forward_rules = ipt.find({'target': Rule.RULE_TARGETS, 'chain': ['FORWARD'], 'prot': ['all']})
             rules.extend(forward_rules)
         return rules
 
