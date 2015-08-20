@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+# Copyright (c) 2015 Sam Russell <sam.h.russell@gmail.com>
 # Copyrite (c) 2014 SecurityKISS Ltd (http://www.securitykiss.com)  
 #
 # This file is part of rfw
@@ -69,6 +70,9 @@ class Rule(RuleProto):
             return RuleProto.__new__(_cls, **kwargs)
         else:
             return RuleProto.__new__(_cls, [])
+
+    def __hash__(self):
+        return hash((self.chain, self.target, self.prot, self.opt, self.inp, self.out, self.source, self.destination, ))
 
     def __eq__(self, other):
         """Rule equality should ignore such parameters like num, pkts, bytes

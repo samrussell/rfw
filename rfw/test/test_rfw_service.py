@@ -1,3 +1,34 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2015 Sam Russell <sam.h.russell@gmail.com>
+# Copyrite (c) 2014 SecurityKISS Ltd (http://www.securitykiss.com)  
+#
+# This file is part of rfw
+#
+# The MIT License (MIT)
+#
+# Yes, Mr patent attorney, you have nothing to do here. Find a decent job instead. 
+# Fight intellectual "property".
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 from unittest import TestCase
 
 import cmdparse, timeutil, iptables, iputil
@@ -85,5 +116,17 @@ class IptablesTest(TestCase):
         self.assertEquals(str(r2), "Rule(chain='INPUT', num=None, pkts=None, bytes=None, target=None, prot='all', opt='--', inp='*', out='*', source='1.2.3.4', destination='0.0.0.0/0', extra='')")
         r3 = Rule(['INPUT', None, None, None, None, 'all', '--', '*', '*', '1.2.3.4', '0.0.0.0/0', ''])
         self.assertEquals(str(r3), "Rule(chain='INPUT', num=None, pkts=None, bytes=None, target=None, prot='all', opt='--', inp='*', out='*', source='1.2.3.4', destination='0.0.0.0/0', extra='')")
+
+    def test_apply_rule(self):
+        """Apply rules and confirm that they actually turn up
+        """
+        r1 = Rule({'chain': 'INPUT', 'source': '1.2.3.4', 'target' : 'DROP'})
+        baserules = iptables.Iptables.read_simple_rules()
+        iptables.Iptables.exe_rule('I', r1)
+        secondrules = iptables.Iptables.read_simple_rules()
+        self.assertEquals(set(baserules + [r1]), set(secondrules))
+        iptables.Iptables.exe_rule('D', r1)
+        finalrules = iptables.Iptables.read_simple_rules()
+        self.assertEquals(set(baserules), set(finalrules))
 
 
