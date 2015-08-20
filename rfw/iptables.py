@@ -29,7 +29,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import inspect, re, subprocess, logging, json
+import inspect, re, subprocess, logging, json, copy
 from collections import namedtuple
 from threading import RLock
 
@@ -44,6 +44,19 @@ IPTABLES_HEADERS =         ['num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'in
 RULE_ATTRS =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
 RULE_TARGETS =      ['DROP', 'ACCEPT', 'REJECT']
 RULE_CHAINS =       ['INPUT', 'OUTPUT', 'FORWARD']
+RULE_DEFAULTS =     {
+                        'chain': None,
+                        'num': None,
+                        'pkts': None,
+                        'bytes': None,
+                        'target': None,
+                        'prot': 'all',
+                        'opt': '--',
+                        'inp': '*',
+                        'out': '*',
+                        'source': '0.0.0.0/0',
+                        'destination': '0.0.0.0/0'
+                    }
 
 
 RuleProto = namedtuple('Rule', RULE_ATTRS)
@@ -64,9 +77,9 @@ class Rule(RuleProto):
                 for prop in props:
                     if prop not in RULE_ATTRS:
                         raise ValueError('Property %s is not a valid argument to pass to Rule()', prop)
-                d = {'chain': None, 'num': None, 'pkts': None, 'bytes': None, 'target': None, 'prot': 'all', 'opt': '--', 'inp': '*', 'out': '*', 'source': '0.0.0.0/0', 'destination': '0.0.0.0/0'}
-                d.update(props)
-                return RuleProto.__new__(_cls, **d)
+                default_settings = copy.deepcopy(RULE_DEFAULTS)
+                default_settings.update(props)
+                return RuleProto.__new__(_cls, **default_settings)
             else:
                 raise ValueError('The Rule constructor takes either list, dictionary or named properties')
         elif kwargs:
@@ -165,10 +178,11 @@ class Iptables:
             if chain:
                 columns = line.split()
                 if columns and columns[0].isdigit():
-                    # join all extra columns into one extra field
-                    extra = " ".join(columns[10:])
+                    # deal with ports later (won't matter once we get iptc running
+                    ## join all extra columns into one extra field
+                    #extra = " ".join(columns[10:])
                     columns = columns[:10]
-                    columns.append(extra)
+                    #columns.append(extra)
                     columns.insert(0, chain)
                     rule = Rule(columns)
                     rules.append(rule)
@@ -181,6 +195,7 @@ class Iptables:
         ['INPUT', '-p', 'tcp', '-d', '0.0.0.0/0', '-s', '1.2.3.4', '-j', 'ACCEPT']
         It is assumed that the rule is from trusted source (from Iptables.find())
         """
+        # sam here, not going to do extra in this part anymore, will deal with this as a proper attribute
         #TODO handle extras e.g. 'extra': 'tcp dpt:7373 spt:34543'
         #TODO add validations
         #TODO handle wildcards
@@ -190,19 +205,20 @@ class Iptables:
         if r.prot != 'all':
             lcmd.append('-p')
             lcmd.append(r.prot)
-
+        # sam here, breaking this
+        # parsing out source port and dest port should be done by Iptables
         # TODO enhance. For now handle only source and destination port
-        if r.extra:
-            es = r.extra.split()
-            for e in es:
-                if e[:4] == 'dpt:':
-                    dport = e.split(':')[1]
-                    lcmd.append('--dport')
-                    lcmd.append(dport)
-                if e[:4] == 'spt:':
-                    sport = e.split(':')[1]
-                    lcmd.append('--sport')
-                    lcmd.append(sport)
+        #if r.extra:
+            #es = r.extra.split()
+            #for e in es:
+            #    if e[:4] == 'dpt:':
+            #        dport = e.split(':')[1]
+            #        lcmd.append('--dport')
+            #        lcmd.append(dport)
+            #    if e[:4] == 'spt:':
+            #        sport = e.split(':')[1]
+            #        lcmd.append('--sport')
+            #        lcmd.append(sport)
 
         if r.destination != '0.0.0.0/0':
             lcmd.append('-d')
@@ -243,13 +259,13 @@ class Iptables:
         ipt = Iptables.load()
         # rfw originated rules may have only DROP/ACCEPT/REJECT targets and do not specify protocol and do not have extra args like ports
         if chain == 'INPUT' or chain is None:
-            input_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['INPUT'], 'destination': ['0.0.0.0/0'], 'out': ['*'], 'prot': ['all'], 'extra': ['']})
+            input_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['INPUT'], 'destination': ['0.0.0.0/0'], 'out': ['*'], 'prot': ['all']})
             rules.extend(input_rules)
         if chain == 'OUTPUT' or chain is None:
-            output_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['OUTPUT'], 'source': ['0.0.0.0/0'], 'inp': ['*'], 'prot': ['all'], 'extra': ['']})
+            output_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['OUTPUT'], 'source': ['0.0.0.0/0'], 'inp': ['*'], 'prot': ['all']})
             rules.extend(output_rules)
         if chain == 'FORWARD' or chain is None:
-            forward_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['FORWARD'], 'prot': ['all'], 'extra': ['']})
+            forward_rules = ipt.find({'target': RULE_TARGETS, 'chain': ['FORWARD'], 'prot': ['all']})
             rules.extend(forward_rules)
         return rules
 
