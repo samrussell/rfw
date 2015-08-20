@@ -242,19 +242,68 @@ class Iptables:
         lcmd.append(r.target)
         return lcmd
 
+    @staticmethod
+    def convert_ip_and_cidr_to_ip_and_mask(ip_and_cidr):
+        # trivial case: no cidr = /32
+        if '/' not in ip_and_cidr:
+            ip = ip_and_cidr
+            return '%s/255.255.255.255' % ip
+        ip, cidr_str = ip_and_cidr.split('/')
+        cidr = int(cidr_str)
+        # turn '/24' cidr into '255.255.255.0'
+        octets = []
+        octet_samples = [0, 128, 192, 224, 240, 248, 252, 254, 255]
+        for threshold in [0, 8, 16, 24]:
+            offset = cidr - threshold
+            offset = min(offset, 8)
+            offset = max(offset, 0)
+            octets.append(octet_samples[offset])
+        mask = '.'.join(['%d' % x for x in octets])
+        return '%s/%s' % (ip, mask)
+
+    # TODO: parse this somewhere better?
+    @staticmethod
+    def convert_rule_to_iptc_rule(rule):
+        """
+        Inputs:
+        rule: Iptables.Rule object
+        Returns:
+        a Rule object from iptc
+        """
+        # parse these out
+        # Rule._fields =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
+        #return hash((self.chain, self.target, self.prot, self.opt, self.inp, self.out, self.source, self.destination, ))
+        # ignore index and counters
+        iptc_rule = iptc.Rule()
+        target = iptc.Target(iptc_rule, rule.target)
+        iptc_rule.target = target
+        if rule.prot != 'all':
+            iptc_rule.protocol = rule.prot
+        # ignore opt
+        if rule.inp != '*':
+            iptc_rule.in_interface = rule.inp
+        if rule.out != '*':
+            iptc_rule.out_interface = rule.out
+        iptc_rule.src = Iptables.convert_ip_and_cidr_to_ip_and_mask(rule.source)
+        iptc_rule.dst = Iptables.convert_ip_and_cidr_to_ip_and_mask(rule.destination)
+        return iptc_rule
+
+    @staticmethod
+    def exe_rule_iptc(modify, rule):
+        assert modify == 'I' or modify == 'D'
+        # call python-iptables
+        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), rule.chain)
+        iptc_rule = Iptables.convert_rule_to_iptc_rule(rule)
+        if modify == 'I':
+            chain.insert_rule(iptc_rule)
+        if modify == 'D':
+            chain.delete_rule(iptc_rule)
 
     @staticmethod
     def exe_rule(modify, rule):
         assert modify == 'I' or modify == 'D'
         lcmd = Iptables.rule_to_command(rule)
         return Iptables.exe(['-' + modify] + lcmd)
-
-    @staticmethod
-    def exe_rule_iptc(modify, rule):
-        assert modify == 'I' or modify == 'D'
-        # call python-iptables
-        raise NotImplementedError()
-
 
     @staticmethod
     def exe(lcmd):
@@ -307,7 +356,7 @@ class Iptables:
 
     # TODO: parse this somewhere better?
     @staticmethod
-    def parse_rule_iptc(chain_name, index, rule):
+    def convert_iptc_rule_to_rule(chain_name, index, rule):
         """
         Inputs:
         chain_name: name of the chain (string)
@@ -351,7 +400,7 @@ class Iptables:
             # horrible variable name, but 'chain' is the arg (should change this instead)
             chain_chain = iptables_chains_by_name[chain_name]
             for index, rule in enumerate(chain_chain.rules):
-                rules.append(Iptables.parse_rule_iptc(chain_name, index, rule))
+                rules.append(Iptables.convert_iptc_rule_to_rule(chain_name, index, rule))
         return rules
 
     # find is a non-static method as it should be called after instantiation with Iptables.load()

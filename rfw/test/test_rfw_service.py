@@ -152,3 +152,19 @@ class IptablesTest(TestCase):
         self.assertEquals(set(rules_old), set(rules_iptc))
 
 
+    def test_apply_rule_iptc_write_old_read(self):
+        """Apply rules and confirm that they actually turn up
+        Modify with iptc, read with old code
+        """
+        rules_to_test = [
+            Rule({'chain': 'INPUT', 'source': '1.2.2.0/24', 'target' : 'DROP'}),
+            Rule({'chain': 'INPUT', 'source': '1.2.3.4', 'target' : 'DROP'}),
+            ]
+        for rule_to_test in rules_to_test:
+            rules_before_modification = iptables.Iptables.read_simple_rules()
+            iptables.Iptables.exe_rule_iptc('I', rule_to_test)
+            rules_after_insertion = iptables.Iptables.read_simple_rules()
+            self.assertEquals(set(rules_before_modification + [rule_to_test]), set(rules_after_insertion))
+            iptables.Iptables.exe_rule_iptc('D', rule_to_test)
+            rules_after_deletion = iptables.Iptables.read_simple_rules()
+            self.assertEquals(set(rules_before_modification), set(rules_after_deletion))
