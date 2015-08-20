@@ -120,13 +120,16 @@ class IptablesTest(TestCase):
     def test_apply_rule(self):
         """Apply rules and confirm that they actually turn up
         """
-        r1 = Rule({'chain': 'INPUT', 'source': '1.2.3.4', 'target' : 'DROP'})
-        baserules = iptables.Iptables.read_simple_rules()
-        iptables.Iptables.exe_rule('I', r1)
-        secondrules = iptables.Iptables.read_simple_rules()
-        self.assertEquals(set(baserules + [r1]), set(secondrules))
-        iptables.Iptables.exe_rule('D', r1)
-        finalrules = iptables.Iptables.read_simple_rules()
-        self.assertEquals(set(baserules), set(finalrules))
+        rules_to_test = [
+            Rule({'chain': 'INPUT', 'source': '1.2.3.4', 'target' : 'DROP'}),
+            ]
+        for rule_to_test in rules_to_test:
+            rules_before_modification = iptables.Iptables.read_simple_rules()
+            iptables.Iptables.exe_rule('I', rule_to_test)
+            rules_after_insertion = iptables.Iptables.read_simple_rules()
+            self.assertEquals(set(rules_before_modification + [rule_to_test]), set(rules_after_insertion))
+            iptables.Iptables.exe_rule('D', rule_to_test)
+            rules_after_deletion = iptables.Iptables.read_simple_rules()
+            self.assertEquals(set(rules_before_modification), set(rules_after_deletion))
 
 

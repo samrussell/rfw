@@ -41,7 +41,7 @@ log.addHandler(logging.NullHandler())
 
 # note that the 'in' attribute from iptables output was renamed to 'inp' to avoid python keyword clash
 IPTABLES_HEADERS =         ['num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'in', 'out', 'source', 'destination'] 
-RULE_ATTRS =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination', 'extra']
+RULE_ATTRS =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
 RULE_TARGETS =      ['DROP', 'ACCEPT', 'REJECT']
 RULE_CHAINS =       ['INPUT', 'OUTPUT', 'FORWARD']
 
@@ -61,7 +61,10 @@ class Rule(RuleProto):
             if isinstance(props, list):
                 return RuleProto.__new__(_cls, *props)
             elif isinstance(props, dict):
-                d = {'chain': None, 'num': None, 'pkts': None, 'bytes': None, 'target': None, 'prot': 'all', 'opt': '--', 'inp': '*', 'out': '*', 'source': '0.0.0.0/0', 'destination': '0.0.0.0/0', 'extra': ''}
+                for prop in props:
+                    if prop not in RULE_ATTRS:
+                        raise ValueError('Property %s is not a valid argument to pass to Rule()', prop)
+                d = {'chain': None, 'num': None, 'pkts': None, 'bytes': None, 'target': None, 'prot': 'all', 'opt': '--', 'inp': '*', 'out': '*', 'source': '0.0.0.0/0', 'destination': '0.0.0.0/0'}
                 d.update(props)
                 return RuleProto.__new__(_cls, **d)
             else:
