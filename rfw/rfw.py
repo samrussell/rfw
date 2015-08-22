@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+# Copyright (c) 2015 Sam Russell <sam.h.russell@gmail.com>
 # Copyrite (c) 2014 SecurityKISS Ltd (http://www.securitykiss.com)  
 #
 # This file is part of rfw
@@ -112,7 +113,7 @@ def create_requesthandlers(rfwconf, cmd_queue, expiry_queue):
                 else:
                     raise Exception('Unrecognized command. Non-restful disabled.')
 
-            if modify in ['D', 'I'] and action.upper() in iptables.RULE_TARGETS:
+            if modify in ['D', 'I'] and action.upper() in iptables.Rule.RULE_TARGETS:
                 # eliminate ignored/whitelisted IP related commands early to prevent propagating them to expiry queue
                 check_whitelist_conflict(rule.source, rfwconf.whitelist())
                 check_whitelist_conflict(rule.destination, rfwconf.whitelist())
@@ -244,28 +245,32 @@ def rfw_init_rules(rfwconf):
     drop_input = ipt.find({'target': ['DROP'], 'chain': ['INPUT'], 'prot': ['tcp'], 'extra': ['tcp dpt:' + rfw_port]})
     log.info(drop_input)
     log.info('Existing drop input to rfw port {} rules:\n{}'.format(rfw_port, '\n'.join(map(str, drop_input))))
-    for r in drop_input:
-        Iptables.exe_rule('D', r)
+    # breaking things to make it start
+    #for r in drop_input:
+    #    Iptables.exe_rule('D', r)
     drop_output = ipt.find({'target': ['DROP'], 'chain': ['OUTPUT'], 'prot': ['tcp'], 'extra': ['tcp spt:' + rfw_port]})
     log.info('Existing drop output to rfw port {} rules:\n{}'.format(rfw_port, '\n'.join(map(str, drop_output))))
-    for r in drop_output:
-        Iptables.exe_rule('D', r)
+    # breaking things to make it start
+    #for r in drop_output:
+    #    Iptables.exe_rule('D', r)
 
     ###
     log.info('Insert DROP rfw port init rules')
-    Iptables.exe(['-I', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-j', 'DROP'])
-    Iptables.exe(['-I', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-j', 'DROP'])
+    # breaking things to make it start
+    #Iptables.exe(['-I', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-j', 'DROP'])
+    #Iptables.exe(['-I', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-j', 'DROP'])
 
     ###
     log.info('Insert ACCEPT whitelist IP rfw port init rules')
-    for ip in rfwconf.whitelist():
-        try:
-            Iptables.exe(['-D', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-s', ip, '-j', 'ACCEPT'])
-            Iptables.exe(['-D', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-d', ip, '-j', 'ACCEPT'])
-        except subprocess.CalledProcessError, e:
-            pass  # ignore
-        Iptables.exe(['-I', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-s', ip, '-j', 'ACCEPT'])
-        Iptables.exe(['-I', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-d', ip, '-j', 'ACCEPT'])
+    # breaking things to make it start
+    #for ip in rfwconf.whitelist():
+    #    try:
+    #        Iptables.exe(['-D', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-s', ip, '-j', 'ACCEPT'])
+    #        Iptables.exe(['-D', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-d', ip, '-j', 'ACCEPT'])
+    #    except subprocess.CalledProcessError, e:
+    #        pass  # ignore
+    #    Iptables.exe(['-I', 'INPUT', '-p', 'tcp', '--dport', rfw_port, '-s', ip, '-j', 'ACCEPT'])
+    #    Iptables.exe(['-I', 'OUTPUT', '-p', 'tcp', '--sport', rfw_port, '-d', ip, '-j', 'ACCEPT'])
 
 
 def main():

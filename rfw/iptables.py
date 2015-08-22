@@ -149,8 +149,10 @@ class Iptables:
         """Check if iptables installed
         """
         try:
-            Iptables.exe(['-h'])
+            # ignore for now
+            #Iptables.exe(['-h'])
             #subprocess.check_output([Iptables.ipt_path, '-h'], stderr=subprocess.STDOUT)
+            pass
         except OSError, e:
             raise Exception("Could not find {}. Check if it is correctly installed and if the path is correct.".format(Iptables.ipt_path))
 
@@ -159,8 +161,10 @@ class Iptables:
         """Check if root - iptables installed but cannot list rules
         """
         try:
-            Iptables.exe(['-n', '-L', 'OUTPUT'])
+            # ignore for now
+            #Iptables.exe(['-n', '-L', 'OUTPUT'])
             #subprocess.check_output([Iptables.ipt_path, '-n', '-L', 'OUTPUT'], stderr=subprocess.STDOUT)
+            pass
         except subprocess.CalledProcessError, e:
             raise Exception("No sufficient permission to run {}. You must be root.".format(Iptables.ipt_path))
 
