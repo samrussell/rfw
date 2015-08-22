@@ -51,7 +51,9 @@ RuleProto = namedtuple('Rule', [
                             'inp',
                             'out',
                             'source',
-                            'destination'
+                            'destination',
+                            'sport',
+                            'dport',
                         ]
                         )
 
@@ -59,7 +61,8 @@ class Rule(RuleProto):
     """Lightweight immutable value object to store iptables rule
     """
     # note that the 'in' attribute from iptables output was renamed to 'inp' to avoid python keyword clash
-    #Rule._fields =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
+    #Rule._fields =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source',
+    #                       'destination', 'sport', 'dport']
     RULE_TARGETS =      ['DROP', 'ACCEPT', 'REJECT']
     RULE_CHAINS =       ['INPUT', 'OUTPUT', 'FORWARD']
     RULE_DEFAULTS =     {
@@ -73,7 +76,9 @@ class Rule(RuleProto):
                             'inp': '*',
                             'out': '*',
                             'source': '0.0.0.0/0',
-                            'destination': '0.0.0.0/0'
+                            'destination': '0.0.0.0/0',
+                            'sport' : '*',
+                            'dport' : '*',
                         }
 
     def __new__(_cls, *args, **kwargs):
@@ -135,7 +140,7 @@ class Iptables:
 
     @staticmethod
     def load():
-        rules = Iptables._iptables_list()
+        rules = Iptables._iptables_list_iptc()
         inst = Iptables(rules)
         return inst
 
@@ -165,40 +170,59 @@ class Iptables:
         pass
 
     @staticmethod
-    def _iptables_list():
-        """List and parse iptables rules. Do not call directly. Use Iptables.load().rules instead
+    def _iptables_list_iptc():
+        """List and parse iptables rules. Do not call directly. Use Iptables.load_iptc().rules instead
         return list of rules of type Rule.
         """
         rules = []
-        out = Iptables.exe(['-n', '-L', '-v', '-x', '--line-numbers'])
-        #out = subprocess.check_output([Iptables.ipt_path, '-n', '-L', '-v', '-x', '--line-numbers'], stderr=subprocess.STDOUT)
-        chain = None
-        header = None
-        for line in out.split('\n'):
-            line = line.strip()
-            if not line:
-                chain = None  #on blank line reset current chain
-                continue
-            m = re.match(r"Chain (\w+) .*", line)
-            if m and m.group(1) in Rule.RULE_CHAINS:
-                chain = m.group(1)
-                continue
-            if "source" in line and "destination" in line:
-                # check if iptables output headers make sense 
-                assert line.split()  == Iptables.IPTABLES_HEADERS
-                continue
-            if chain:
-                columns = line.split()
-                if columns and columns[0].isdigit():
-                    # deal with ports later (won't matter once we get iptc running
-                    ## join all extra columns into one extra field
-                    #extra = " ".join(columns[10:])
-                    columns = columns[:10]
-                    #columns.append(extra)
-                    columns.insert(0, chain)
-                    rule = Rule(columns)
-                    rules.append(rule)
+        filter_table = iptc.Table(iptc.Table.FILTER)
+        filter_table.refresh()
+        iptables_chains_by_name = {chain.name : chain for chain in filter_table.chains}
+        chains_to_search = Rule.RULE_CHAINS
+        for chain_name in chains_to_search:
+            # horrible variable name, but 'chain' is the arg (should change this instead)
+            chain_chain = iptables_chains_by_name[chain_name]
+            for index, rule in enumerate(chain_chain.rules):
+                rules.append(Iptables.convert_iptc_rule_to_rule(chain_name, index, rule))
         return rules
+    
+#    @staticmethod
+#    def _iptables_list():
+#        """List and parse iptables rules. Do not call directly. Use Iptables.load().rules instead
+#        return list of rules of type Rule.
+#        """
+#        rules = []
+#        out = Iptables.exe(['-n', '-L', '-v', '-x', '--line-numbers'])
+#        #out = subprocess.check_output([Iptables.ipt_path, '-n', '-L', '-v', '-x', '--line-numbers'], stderr=subprocess.STDOUT)
+#        chain = None
+#        header = None
+#        for line in out.split('\n'):
+#            line = line.strip()
+#            if not line:
+#                chain = None  #on blank line reset current chain
+#                continue
+#            m = re.match(r"Chain (\w+) .*", line)
+#            if m and m.group(1) in Rule.RULE_CHAINS:
+#                chain = m.group(1)
+#                continue
+#            if "source" in line and "destination" in line:
+#                # check if iptables output headers make sense 
+#                assert line.split()  == Iptables.IPTABLES_HEADERS
+#                continue
+#            if chain:
+#                columns = line.split()
+#                if columns and columns[0].isdigit():
+#                    # deal with ports later (won't matter once we get iptc running)
+#                    # cheat on ports now and add blank sport/dport
+#                    ## join all extra columns into one extra field
+#                    #extra = " ".join(columns[10:])
+#                    columns = columns[:10]
+#                    #columns.append(extra)
+#                    columns = columns + ['*', '*']
+#                    columns.insert(0, chain)
+#                    rule = Rule(columns)
+#                    rules.append(rule)
+#        return rules
     
    
     @staticmethod
