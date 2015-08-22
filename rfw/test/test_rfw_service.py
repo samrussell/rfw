@@ -167,6 +167,8 @@ class IptablesTest(TestCase):
         """Apply rules and confirm that they actually turn up
         Modify with iptc, read with old code
         """
+        # test passes, don't care anymore - removing old code
+        return
         rules_to_test = [
             Rule({'chain': 'INPUT', 'source': '1.2.2.0/24', 'target' : 'DROP'}),
             Rule({'chain': 'INPUT', 'source': '1.2.3.4', 'target' : 'DROP'}),
@@ -188,4 +190,16 @@ class IptablesTest(TestCase):
         rules_old = iptables.Iptables._iptables_list()
         rules_iptc = iptables.Iptables._iptables_list_iptc()
         self.assertEquals(set(rules_old), set(rules_iptc))
+
+    def test_sport_dport(self):
+        """ Apply rules with Iptables.exe_old() and compare them to iptc
+        """
+        rule_to_test = Rule({'chain': 'INPUT', 'source': '2.2.2.2', 'target' : 'ACCEPT', 'prot' : 'tcp', 'dport' : '5679'})
+        rules_before_modification = iptables.Iptables._iptables_list_iptc()
+        iptables.Iptables.exe_old(['-I', 'INPUT', '-p', 'tcp', '--dport', '5679', '-s', '2.2.2.2', '-j', 'ACCEPT'])
+        rules_after_insertion = iptables.Iptables._iptables_list_iptc()
+        self.assertEquals(set(rules_before_modification + [rule_to_test]), set(rules_after_insertion))
+        iptables.Iptables.exe_old(['-D', 'INPUT', '-p', 'tcp', '--dport', '5679', '-s', '2.2.2.2', '-j', 'ACCEPT'])
+        rules_after_deletion = iptables.Iptables._iptables_list_iptc()
+        self.assertEquals(set(rules_before_modification), set(rules_after_deletion))
 

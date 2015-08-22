@@ -295,7 +295,7 @@ class Iptables:
         a Rule object from iptc
         """
         # parse these out
-        # Rule._fields =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination']
+        # Rule._fields =      ['chain', 'num', 'pkts', 'bytes', 'target', 'prot', 'opt', 'inp', 'out', 'source', 'destination', 'sport', 'dport']
         #return hash((self.chain, self.target, self.prot, self.opt, self.inp, self.out, self.source, self.destination, ))
         # ignore index and counters
         iptc_rule = iptc.Rule()
@@ -310,10 +310,18 @@ class Iptables:
             iptc_rule.out_interface = rule.out
         iptc_rule.src = Iptables.convert_ip_and_cidr_to_ip_and_mask(rule.source)
         iptc_rule.dst = Iptables.convert_ip_and_cidr_to_ip_and_mask(rule.destination)
+        if rule.sport != '*' or rule.dport != '*':
+            assert rule.prot == 'tcp' or rule.prot == 'udp'
+            match = iptc.Match(rule, rule.prot)
+            if rule.sport != '*':
+                match.sport = rule.sport
+            if rule.dport != '*':
+                match.dport = rule.dport
+            rule.add_match(match)
         return iptc_rule
 
     @staticmethod
-    def exe_rule_iptc(modify, rule):
+    def exe_rule(modify, rule):
         assert modify == 'I' or modify == 'D'
         # call python-iptables
         chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), rule.chain)
@@ -324,13 +332,13 @@ class Iptables:
             chain.delete_rule(iptc_rule)
 
     @staticmethod
-    def exe_rule(modify, rule):
+    def exe_rule_old(modify, rule):
         assert modify == 'I' or modify == 'D'
         lcmd = Iptables.rule_to_command(rule)
-        return Iptables.exe(['-' + modify] + lcmd)
+        return Iptables.exe_old(['-' + modify] + lcmd)
 
     @staticmethod
-    def exe(lcmd):
+    def exe_old(lcmd):
         cmd = [Iptables.ipt_path] + lcmd
         try:
             log.debug('Iptables.exe(): {}'.format(' '.join(cmd)))
@@ -410,6 +418,16 @@ class Iptables:
         rule_attributes['out'] = rule.out_interface if rule.out_interface else '*'
         rule_attributes['source'] = Iptables.convert_ip_and_mask_to_ip_and_cidr(rule.src)
         rule_attributes['destination'] = Iptables.convert_ip_and_mask_to_ip_and_cidr(rule.dst)
+        rule_attributes['sport'] = '*'
+        rule_attributes['dport'] = '*'
+        # parse out sport/dport if protocol is set
+        if protocol =='tcp' or protocol =='udp':
+            for match in rule.matches:
+                if match.name == 'udp' or match.name == 'tcp':
+                    if match.sport:
+                        rule_attributes['sport'] = match.sport
+                    if match.dport:
+                        rule_attributes['dport'] = match.dport
         return Rule(rule_attributes)
 
     @staticmethod
